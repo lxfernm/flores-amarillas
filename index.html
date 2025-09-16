@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flores amarillas</title>
+  <style>
+    :root{
+      --bg:#f7f6eb;
+      --yellow:#f6c90e;
+      --yellow2:#ffd84d;
+      --brown:#6b4f2a;
+      --green:#4caf50;
+      --green2:#2e7d32;
+    }
+    html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 70% 20%, #ffffff, var(--bg));}
+    canvas{display:block;width:100vw;height:100vh;}
+
+    /* Título dedicado */
+    .titulo{
+      position:fixed;
+      top:16px; left:50%; transform:translateX(-50%);
+      z-index:20;
+      font-family:system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      font-size:28px; font-weight:700; letter-spacing:.2px;
+      color:#f6c90e;
+      text-shadow:2px 2px 6px rgba(0,0,0,.25);
+      background:rgba(255,255,255,.65);
+      padding:6px 14px; border-radius:12px;
+      user-select:none;
+    }
+
+    .ui{
+      position:fixed;inset:auto 12px 12px auto;z-index:10;
+      background:rgba(255,255,255,.8);backdrop-filter: blur(6px);
+      border:1px solid #e6e2cf;border-radius:18px;padding:10px 14px;
+      box-shadow:0 8px 24px rgba(0,0,0,.08);
+      font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;
+    }
+    .row{display:flex;align-items:center;gap:8px;margin:.25rem 0}
+    label{font-size:12px;color:#444}
+    input[type="range"]{accent-color:var(--yellow);}
+    button{
+      border:none;background:var(--yellow);color:#2a2007;font-weight:600;cursor:pointer;
+      padding:8px 12px;border-radius:14px;box-shadow:0 4px 12px rgba(0,0,0,.12);
+    }
+    button:hover{filter:brightness(1.05)}
+  </style>
+</head>
+<body>
+  <h1 class="titulo">Para mi personita especial 💛</h1>
+  <canvas id="c"></canvas>
+
+  <div class="ui">
+    <div class="row"><label>Flores: <span id="count">12</span></label><input id="n" type="range" min="1" max="80" value="12"></div>
+    <div class="row"><label>Tamaño</label><input id="size" type="range" min="14" max="80" value="40"></div>
+    <div class="row"><label>Viento</label><input id="wind" type="range" min="0" max="100" value="30"></div>
+    <div class="row"><button id="regen">Nueva composición</button><button id="snap" title="Descargar imagen (PNG)" style="margin-left:6px">📸 Guardar</button></div>
+    <div class="row" style="font-size:11px;color:#666">Haz clic en el lienzo para plantar una flor 🌼</div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const DPR = Math.max(1, window.devicePixelRatio || 1);
+
+    const ui = {
+      n: document.getElementById('n'),
+      size: document.getElementById('size'),
+      wind: document.getElementById('wind'),
+      count: document.getElementById('count'),
+      regen: document.getElementById('regen'),
+      snap: document.getElementById('snap')
+    };
+
+    let W=0,H=0,time=0;
+    let flowers = [];
+
+    function resize(){
+      W = canvas.width = Math.floor(innerWidth * DPR);
+      H = canvas.height = Math.floor(innerHeight * DPR);
+      canvas.style.width = innerWidth + 'px';
+      canvas.style.height = innerHeight + 'px';
+    }
+    addEventListener('resize', resize);
+    resize();
+
+    function rand(a,b){return a + Math.random()*(b-a)}
+
+    function createFlower(x,y){
+      const base = +ui.size.value;
+      return {
+        x, y, base,
+        petals: 10 + (Math.random()*6|0),
+        radius: base*rand(0.8,1.25),
+        hue: rand(45,52), // amarillo
+        sway: rand(.6,1.2),
+        stemH: rand(60,120) * base/40,
+        leafAngle: rand(.2,.9),
+        phase: Math.random()*Math.PI*2
+      };
+    }
+
+    function seedRandomFlowers(){
+      flowers = [];
+      const n = +ui.n.value;
+      for(let i=0;i<n;i++){
+        const x = rand(60*DPR, W-60*DPR);
+        const y = rand(H*0.55, H-40*DPR);
+        flowers.push(createFlower(x,y));
+      }
+      ui.count.textContent = n;
+    }
+
+    function drawBackground(){
+      const g = ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,'#eaf6ff');
+      g.addColorStop(.6,'#f7f6eb');
+      ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+      const g2 = ctx.createLinearGradient(0,H*0.6,0,H);
+      g2.addColorStop(0,'#cfe8c8');
+      g2.addColorStop(1,'#a6d39c');
+      ctx.fillStyle = g2; ctx.fillRect(0,H*0.6,W,H*0.4);
+    }
+
+    function drawStem(f, t){
+      const sway = Math.sin(t*0.002 + f.phase) * f.sway * (ui.wind.value/100);
+      const x0 = f.x, y0 = f.y;
+      const x1 = x0 + f.stemH*0.05*DPR;
+      const y1 = y0 - f.stemH*0.5*DPR;
+      const x2 = x0 + sway*30*DPR;
+      const y2 = y0 - f.stemH*DPR;
+
+      ctx.lineWidth = Math.max(2, f.base*0.12*DPR);
+      ctx.strokeStyle = '#2e7d32';
+      ctx.beginPath();
+      ctx.moveTo(x0,y0);
+      ctx.quadraticCurveTo(x1,y1,x2,y2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#3fa34d';
+      ctx.beginPath();
+      const ha = f.leafAngle;
+      const hx = x0 + (x1-x0)*0.7;
+      const hy = y0 - f.stemH*0.35*DPR;
+      const leafW = f.base*0.9*DPR, leafH = f.base*0.5*DPR;
+      ctx.ellipse(hx, hy, leafW, leafH, -ha, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    function drawFlower(f, t){
+      const cx = f.x + Math.sin(t*0.002 + f.phase)*8*DPR*(ui.wind.value/100);
+      const cy = f.y - f.stemH*DPR;
+
+      const petals = f.petals;
+      const R = f.radius;
+      const a = R * 0.55;
+      const b = R * 0.28;
+
+      for (let i = 0; i < petals; i++){
+        const angle = (i/petals)*Math.PI*2 + Math.sin(t*0.003 + f.phase)*0.05;
+        const px = cx + Math.cos(angle) * (R * 0.62);
+        const py = cy + Math.sin(angle) * (R * 0.62);
+        const tipx = cx + Math.cos(angle) * (R * 1.15);
+        const tipy = cy + Math.sin(angle) * (R * 1.15);
+        const grad = ctx.createLinearGradient(px, py, tipx, tipy);
+        grad.addColorStop(0, 'hsl(48,95%,60%)');
+        grad.addColorStop(1, 'hsl(54,100%,72%)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(px, py, a, b, angle, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      ctx.fillStyle = '#6b4f2a';
+      ctx.arc(cx, cy, R*0.24, 0, Math.PI*2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(255,255,255,.25)';
+      ctx.arc(cx - R*0.10, cy - R*0.10, R*0.09, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    function frame(t){
+      time = t;
+      drawBackground();
+      flowers.sort((a,b)=> (a.y-a.stemH) - (b.y-b.stemH));
+      for(const f of flowers){
+        drawStem(f, t);
+        drawFlower(f, t);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    canvas.addEventListener('click', (e)=>{
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * DPR;
+      const y = (e.clientY - rect.top) * DPR;
+      flowers.push(createFlower(x, y));
+      ui.count.textContent = flowers.length;
+    });
+
+    ui.n.addEventListener('input', ()=>{ seedRandomFlowers(); });
+    ui.size.addEventListener('input', ()=>{ for(const f of flowers){ f.base = +ui.size.value; f.radius = f.base*0.9; } });
+    ui.regen.addEventListener('click', seedRandomFlowers);
+    ui.snap.addEventListener('click', ()=>{
+      const link = document.createElement('a');
+      link.download = 'flores-amarillas.png';
+      const out = document.createElement('canvas');
+      out.width = innerWidth; out.height = innerHeight;
+      const octx = out.getContext('2d');
+      octx.drawImage(canvas, 0,0, out.width, out.height);
+      link.href = out.toDataURL('image/png');
+      link.click();
+    });
+
+    seedRandomFlowers();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
